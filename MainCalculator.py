@@ -263,17 +263,22 @@ class ThreadedProcessor( threading.Thread ):
                         if current is None:
                             current = 0
                         TableConn[person] = current + 1
+                currenthighest = 0
                 for person in TableConn.keys():
                     for reps in self.ListByPerson[person]:
                         current = TableRepos.get(reps)
                         if current is None:
                             current = 0
                         TableRepos[reps] = current + TableConn[person]
-                PARENTFACTOR = 300
-                CHILDFACTOR = 200
+                        if TableRepos[reps] > currenthighest:
+                            currenthighest = TableRepos[reps]
+                for repos in TableRepos:
+                    TableRepos[repos] = TableRepos[repos]*100/currenthighest
+                PARENTFACTOR = 30
+                CHILDFACTOR = 20
                 EXTRACHILDFACTOR = 0
-                KNOWNFACTOR = 400
-                BROTHERFACTOR = 100
+                KNOWNFACTOR = 40
+                BROTHERFACTOR = 10
                 for repos in self.lib.ChildrenList.keys():
                     alreadyknown = repos in self.ListByPerson[user]
                     reposchildren = len(self.lib.ChildrenList[repos])
@@ -336,9 +341,10 @@ class ThreadedProcessor( threading.Thread ):
                 f = len(self.lib.TestList[user])
                 if  f < r:
                     self.lib.TestList[user].extend([x for x in repossortedkeys if not x in self.lib.TestList[user] and not x in self.lib.ListByPerson[user]][0:r-f])
-            #self.writeData(user)
+            self.writeData(user)
             e = e + 1
-            print str(e) + " added Suggestions"
+            print str(e) + " suggestion scores:"
+            print [ TableRepos.get(x) for x in self.lib.TestList[user] ]
                 
 
 
