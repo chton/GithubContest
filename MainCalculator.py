@@ -10,6 +10,7 @@ import threading
 import Queue
 import operator
 from math import sqrt
+import array
 
 class MainCalculator(object):
     '''
@@ -267,26 +268,40 @@ class ThreadedProcessor( threading.Thread ):
                         current = TableRepos.get(reps)
                         if current is None:
                             current = 0
-                        TableRepos[reps] = current + 1
-                PARENTFACTOR = 1000
-                CHILDFACTOR = 1000
-                BROTHERFACTOR = 100
+                        TableRepos[reps] = current + TableConn[person]
+                PARENTFACTOR = 300
+                CHILDFACTOR = 200
+                EXTRACHILDFACTOR = 100
+                KNOWNFACTOR = 30
+                BROTHERFACTOR = 50
                 for repos in self.lib.ChildrenList.keys():
-                    current = TableRepos.get(repos)
-                    if current is None:
-                        current = 0
+                    alreadyknown = repos in self.ListByPerson[user]
+                    reposchildren = len(self.lib.ChildrenList[repos])
+                    #alreadysuggested = TableRepos.get(repos) is not None
                     purifiedlist = [x for x in self.lib.ChildrenList[repos] if x not in self.ListByPerson[user]]
                     commonlist = [x for x in self.lib.ChildrenList[repos] if x in self.ListByPerson[user]]
-                    if repos in self.ListByPerson[user] and len(commonlist) == 0:            
+                    hasknownchild = len(commonlist) > 0
+                    if alreadyknown and not hasknownchild:            
                         for rep in purifiedlist:
-                            TableRepos[rep] = current + CHILDFACTOR
-                    elif repos in self.ListByPerson[user] and len(commonlist) > 0:
+                            if TableRepos.get(rep) is None:
+                                TableRepos[rep] = 0                            
+                            TableRepos[rep] += CHILDFACTOR
+                    elif alreadyknown and hasknownchild:
                         for rep in purifiedlist:
-                            TableRepos[rep] = current + BROTHERFACTOR  
-                    elif repos not in self.ListByPerson[user] and len(commonlist) > 0:
-                        TableRepos[repos] = current + PARENTFACTOR   
+                            if TableRepos.get(rep) is None:
+                                TableRepos[rep] = 0  
+                            TableRepos[rep] += BROTHERFACTOR
+                    elif not alreadyknown and hasknownchild: 
+                        if TableRepos.get(repos) is None:
+                                TableRepos[repos] = 0 
+                        TableRepos[repos] += PARENTFACTOR
                         for rep in purifiedlist:
-                            TableRepos[rep] = current + BROTHERFACTOR
+                            if TableRepos.get(rep) is None:
+                                TableRepos[rep] = 0   
+                            TableRepos[rep] += BROTHERFACTOR
+                            TableRepos[repos] += EXTRACHILDFACTOR
+                        for rep in commonlist:
+                            TableRepos[repos] += KNOWNFACTOR
                 tuples = [(i, TableRepos[i]) for i in TableRepos.keys()] # if not self.TableConn[user][i] is None]  
                 peopletuples = [(i, TableConn[i]) for i in TableConn.keys()] 
                 #print tuples           

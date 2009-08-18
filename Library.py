@@ -75,7 +75,7 @@ class ThreadedLibCalcer( threading.Thread ):
                 user = int(self.userpool.get()) 
                 if not user in self.ListByPerson:
                     self.ListByPerson[user] = []
-                repos = self.ListByPerson[user]
+                #repos = self.ListByPerson[user]
                 """self.TableConn[user] = {}
                 self.TableRepos[user] = {}
                 #neighbours = []
