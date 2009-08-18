@@ -271,9 +271,9 @@ class ThreadedProcessor( threading.Thread ):
                         TableRepos[reps] = current + TableConn[person]
                 PARENTFACTOR = 300
                 CHILDFACTOR = 200
-                EXTRACHILDFACTOR = 100
-                KNOWNFACTOR = 30
-                BROTHERFACTOR = 50
+                EXTRACHILDFACTOR = 0
+                KNOWNFACTOR = 400
+                BROTHERFACTOR = 100
                 for repos in self.lib.ChildrenList.keys():
                     alreadyknown = repos in self.ListByPerson[user]
                     reposchildren = len(self.lib.ChildrenList[repos])
