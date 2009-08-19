@@ -64,11 +64,15 @@ class MainReader(object):
             lineparts = line.split(',')
             repos = lineparts[0].split(':')
             reposnumber = int(repos[0])
+            repodata = repos[1].split('/')
             if len(lineparts) > 2:
                 forkedfrom = int(lineparts[2])
                 if forkedfrom not in self.lib.ChildrenList.keys():
                     self.lib.ChildrenList[forkedfrom] = []
                 self.lib.ChildrenList[forkedfrom].append(reposnumber)  
+            self.lib.ReposData[reposnumber] = {} 
+            self.lib.ReposData[reposnumber]["author"] = repodata[0]
+            self.lib.ReposData[reposnumber]["name"] = repodata[1]
             i = i + 1
         f.close()
         print "FINISHED REPOS DATA READ"
@@ -88,7 +92,6 @@ class ThreadedProcessor( threading.Thread ):
     
     def run(self):
         i = 0
-        time.sleep(3)
         while (not self.linepool.empty()) and (i < 500000):       
             line = self.linepool.get()
             line = line.strip()

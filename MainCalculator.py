@@ -80,7 +80,6 @@ class ThreadedProcessor( threading.Thread ):
                         currenthighest = TableRepos[reps]
             for repos in TableRepos:
                 TableRepos[repos] = TableRepos[repos]*100/currenthighest
-
             """forks"""
             PARENTFACTOR = 30
             CHILDFACTOR = 10
@@ -105,29 +104,35 @@ class ThreadedProcessor( threading.Thread ):
                         TableRepos[rep] += BROTHERFACTOR
                     for rep in commonlist:
                         TableRepos[repos] += KNOWNFACTOR
-                        
+            
+            """adding repos by known authors"""
+            AUTHORFACTOR = 40
+            knownauthors = []
+            for repos in self.ListByPerson[user]:
+                knownauthors.append(self.lib.ReposData[repos]["author"])
+            for repos in [x for x in TableRepos.iterkeys() if self.lib.ReposData[x]["author"] in knownauthors]:
+                    TableRepos[repos] += AUTHORFACTOR
+                
             """sorting and filling of second suggestion list (repos of top common users)"""          
-            tuples = [(i, TableRepos[i]) for i in TableRepos.keys()] # if not self.TableConn[user][i] is None]  
-            peopletuples = [(i, TableConn[i]) for i in TableConn.keys()] 
             #print tuples           
-            sortedtuples = sorted(tuples , key=operator.itemgetter(1))
-            sortedpeopletuples = sorted(tuples , key=operator.itemgetter(1))
+            sortedList =  sorted(TableRepos, key=TableRepos.__getitem__)
+            sortedPeopleList = sorted(TableConn, key=TableRepos.__getitem__)
+            sortedList.reverse()
+            sortedPeopleList.reverse()
             #print len(sortedtuples)
-            sortedtuples.reverse()
-            sortedpeopletuples.reverse()
             testsuggestions = []
             y = 0
             userset = set(self.ListByPerson[user])
-            testsuggestions.extend([i for i, y in sortedtuples])
+            testsuggestions.extend(sortedList)
             secondsuggestions = []
-            while y < len(sortedtuples):
-                person, score = sortedtuples[y]
+            while y < len(sortedPeopleList):
+                person = sortedPeopleList[y]
                 if person in self.ListByPerson:
                     reposset = set(self.ListByPerson[person])
                     secondsuggestions.extend(reposset.difference(userset))
                 y = y + 1
-            testsuggestions.sort(key=lambda x: self.TableRepos[x])
-            secondsuggestions.sort(key=lambda x: self.TableRepos[x])
+            testsuggestions.sort(key=lambda x: self.TableRepos.get(x))
+            secondsuggestions.sort(key=lambda x: self.TableRepos.get(x))
             
             """filling final testlist"""
             l = len(testsuggestions)  
