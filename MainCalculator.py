@@ -106,7 +106,7 @@ class ThreadedProcessor( threading.Thread ):
                         TableRepos[repos] += KNOWNFACTOR
             
             """adding repos by known authors"""
-            AUTHORFACTOR = 40
+            AUTHORFACTOR = 17
             knownauthors = []
             for repos in self.ListByPerson[user]:
                 knownauthors.append(self.lib.ReposData[repos]["author"])
@@ -150,8 +150,7 @@ class ThreadedProcessor( threading.Thread ):
                 self.lib.TestList[user].extend([x for x in repossortedkeys if not x in self.lib.TestList[user] and not x in self.lib.ListByPerson[user]][0:r-f])
             self.writeData(user)
             e = e + 1
-            print str(e) + " suggestion scores:"
-            print [ TableRepos.get(x) for x in self.lib.TestList[user] ]
+            print str(e) + " added suggestions"
         self.userpool.pop()
                   
     
