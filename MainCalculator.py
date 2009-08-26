@@ -9,10 +9,12 @@ import time
 import threading
 import Queue
 import operator
-from math import sqrt
+from math import sqrt, log
 import array
 import collections
 from collections import deque
+from time import time, sleep
+from heapq import nlargest
 
 class MainCalculator(object):
     '''
@@ -26,9 +28,9 @@ class MainCalculator(object):
     def run(self):
         userpool = deque()
         userpool.append(0)
-        ThreadedProcessor(self.lib, userpool).start()
-        while len(userpool) > 0:
-            time.sleep(1)   
+        ThreadedProcessor(self.lib, userpool).run()
+       # while len(userpool) > 0:
+       #     sleep(1)
     
     
     
@@ -44,7 +46,7 @@ class MainCalculator(object):
                 
         return sorted(dict.keys(), comparer)          
             
-class ThreadedProcessor( threading.Thread ):
+class ThreadedProcessor( object ):
         
     def __init__(self, lib, userpool):
         self.lib = lib
@@ -55,85 +57,106 @@ class ThreadedProcessor( threading.Thread ):
         self.userpool = userpool
         self.TableConn = lib.TableConn
         self.TableRepos = lib.TableRepos
-        threading.Thread.__init__ ( self )
+        self.ChildrenList = lib.ChildrenList
+        #threading.Thread.__init__ ( self )
                
             
     def run(self):
         e = 0
         repossortedkeys = self.sortByPop(self.lib.ListByRepos)
         repossortedkeys.reverse()
-        for testuser in self.lib.TestList:             
+        timeinit = 0
+        timescoring = 0
+        timeforks = 0
+        timeauthors = 0
+        timesorting = 0
+        timefinal = 0
+        for testuser in self.lib.TestList:       
+            time1 = time()      
             user = int(testuser) 
             """closeness calc per user"""
             TableConn = collections.defaultdict(int)
             TableRepos = collections.defaultdict(int)
+            ConnRepos = collections.defaultdict(int)
+            Scoring = collections.defaultdict(int)
+            ReposRatio = collections.defaultdict(float)
+            knownauthors = []
+            knownnames = []
+            SecondGenReposList = []
             repos = self.ListByPerson[user]
             for rep in repos:
                 for person in self.ListByRepos[rep]:
                     TableConn[person] +=  1
+                    SecondGenReposList.extend(self.ListByPerson[person])
+                knownauthors.append(self.lib.ReposData[rep]["author"])
+                reponame = self.lib.ReposData[rep]["name"].lower()
+                strippedreponame = reponame.replace('-', '.').replace('_', '.')
+                knownnames.extend(strippedreponame.split('.'))
+                
+            time2 = time()
             """weighted closeness calc per repos"""
             currenthighest = 0
             for person in TableConn:
                 for reps in self.ListByPerson[person]:
                     TableRepos[reps] += TableConn[person]
+                    ConnRepos[reps] += 1                    
                     if TableRepos[reps] > currenthighest:
                         currenthighest = TableRepos[reps]
             for repos in TableRepos:
-                TableRepos[repos] = TableRepos[repos]*100/currenthighest
+                ReposRatio[repos] = float(ConnRepos[repos])/len(self.lib.ListByRepos)
+                Scoring[repos] = TableRepos[repos]*100/currenthighest
+            time3 = time()
             """forks"""
             PARENTFACTOR = 30
             CHILDFACTOR = 10
             KNOWNFACTOR = 40
             BROTHERFACTOR = 10
-            for repos in self.lib.ChildrenList:
+            FACTOR = 0
+            for repos in self.ChildrenList:
                 alreadyknown = repos in self.ListByPerson[user]
-                reposchildren = len(self.lib.ChildrenList[repos])
+                reposchildren = len(self.ChildrenList[repos])
                 #alreadysuggested = TableRepos.get(repos) is not None
-                purifiedlist = [x for x in self.lib.ChildrenList[repos] if x not in self.ListByPerson[user]]
-                commonlist = [x for x in self.lib.ChildrenList[repos] if x in self.ListByPerson[user]]
-                hasknownchild = len(commonlist) > 0
-                if alreadyknown and not hasknownchild:            
-                    for rep in purifiedlist:                        
-                        TableRepos[rep] += CHILDFACTOR
-                elif alreadyknown and hasknownchild:
+                purifiedlist = set(self.ChildrenList[repos]) - set(self.ListByPerson[user])
+                commonlist = set(self.ChildrenList[repos]) - purifiedlist
+                hasknownchild = len(commonlist) > 0    
+                if hasknownchild:
+                    FACTOR = BROTHERFACTOR
+                    if not alreadyknown:
+                        Scoring[repos] += (PARENTFACTOR + (KNOWNFACTOR*len(commonlist)))
+                elif alreadyknown: 
+                    FACTOR = CHILDFACTOR  
+                if FACTOR > 0:
                     for rep in purifiedlist:
-                        TableRepos[rep] += BROTHERFACTOR
-                elif not alreadyknown and hasknownchild: 
-                    TableRepos[repos] += PARENTFACTOR
-                    for rep in purifiedlist:
-                        TableRepos[rep] += BROTHERFACTOR
-                    for rep in commonlist:
-                        TableRepos[repos] += KNOWNFACTOR
-            
+                        Scoring[rep] += FACTOR
+                    
+            time4 = time()
             """adding repos by known authors"""
-            AUTHORFACTOR = 17
-            knownauthors = []
-            for repos in self.ListByPerson[user]:
-                knownauthors.append(self.lib.ReposData[repos]["author"])
-            for repos in [x for x in TableRepos.iterkeys() if self.lib.ReposData[x]["author"] in knownauthors]:
-                    TableRepos[repos] += AUTHORFACTOR
-                
+            AUTHORFACTOR = 17             
+            for repos in [x for x in Scoring.iterkeys() if self.lib.ReposData[x]["author"] in knownauthors]:
+                    Scoring[repos] += AUTHORFACTOR
+            time5 = time()
+            
+            """adding repos by names"""
+            NAMEFACTOR = 10
+            for repos in Scoring:
+                 reponame = self.lib.ReposData[repos]["name"].lower()
+                 strippedreponame = reponame.replace('-', '.').replace('_', '.')
+                 commonlist = [x for x in strippedreponame.split('.') if x in knownnames]
+                 if len(commonlist) > 0:
+                     Scoring[repos] += NAMEFACTOR
+            
             """sorting and filling of second suggestion list (repos of top common users)"""          
             #print tuples           
-            sortedList =  sorted(TableRepos, key=TableRepos.__getitem__)
-            sortedPeopleList = sorted(TableConn, key=TableRepos.__getitem__)
-            sortedList.reverse()
-            sortedPeopleList.reverse()
-            #print len(sortedtuples)
-            testsuggestions = []
-            y = 0
+            sortedList =  nlargest(10, Scoring, key=Scoring.__getitem__)
+            sortedPeopleList = nlargest(2, self.ListByPerson, key=TableConn.__getitem__)
             userset = set(self.ListByPerson[user])
-            testsuggestions.extend(sortedList)
+            testsuggestions = sortedList
             secondsuggestions = []
-            while y < len(sortedPeopleList):
-                person = sortedPeopleList[y]
-                if person in self.ListByPerson:
-                    reposset = set(self.ListByPerson[person])
-                    secondsuggestions.extend(reposset.difference(userset))
-                y = y + 1
-            testsuggestions.sort(key=lambda x: self.TableRepos.get(x))
+            for person in sortedPeopleList:
+                reposset = set(self.ListByPerson[person])
+                secondsuggestions.extend(reposset.difference(userset))
             secondsuggestions.sort(key=lambda x: self.TableRepos.get(x))
-            
+            time6 = time()
             """filling final testlist"""
             l = len(testsuggestions)  
             d = len(secondsuggestions)          
@@ -150,7 +173,22 @@ class ThreadedProcessor( threading.Thread ):
                 self.lib.TestList[user].extend([x for x in repossortedkeys if not x in self.lib.TestList[user] and not x in self.lib.ListByPerson[user]][0:r-f])
             self.writeData(user)
             e = e + 1
-            print str(e) + " added suggestions"
+            time7 = time()
+            print str(e) + " added suggestions in " + str(time7 - time1)
+            """
+            timeinit = (timeinit + time2-time1)/2
+            timescoring = (timescoring + time3-time2)/2
+            timeforks = (timeforks + time4-time3)/2
+            timeauthors = (timeauthors + time5-time4)/2
+            timesorting = (timesorting + time6-time5)/2
+            timefinal = (timefinal + time7-time6)/2
+            print "timeinit = " + str(timeinit)
+            print "timescoring = " + str(timescoring)
+            print "timeforks = " + str(timeforks)
+            print "timeauthors = " + str(timeauthors)
+            print "timesorting = " + str(timesorting)
+            print "timefinal = " + str(timefinal)
+            """
         self.userpool.pop()
                   
     

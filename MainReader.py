@@ -59,22 +59,18 @@ class MainReader(object):
         print "STARTING REPOS DATA READ"
         f = open('data/repos.txt')
         i = 0
+        linepool = Queue.Queue ( 0 )
         for line in f.readlines():
-            line = line.strip()
-            lineparts = line.split(',')
-            repos = lineparts[0].split(':')
-            reposnumber = int(repos[0])
-            repodata = repos[1].split('/')
-            if len(lineparts) > 2:
-                forkedfrom = int(lineparts[2])
-                if forkedfrom not in self.lib.ChildrenList.keys():
-                    self.lib.ChildrenList[forkedfrom] = []
-                self.lib.ChildrenList[forkedfrom].append(reposnumber)  
-            self.lib.ReposData[reposnumber] = {} 
-            self.lib.ReposData[reposnumber]["author"] = repodata[0]
-            self.lib.ReposData[reposnumber]["name"] = repodata[1]
+            linepool.put(line)
             i = i + 1
         f.close()
+        print "END FILE READ"
+        print "STARTING THREADS"
+        for x in range(1):
+            ThreadedProcessorReposData(self.lib, linepool).start()
+        while not linepool.empty():
+            time.sleep(1)   
+        print "THREADS ALL FINISHED!" 
         print "FINISHED REPOS DATA READ"
         print "Data in Children: " + str(len(self.lib.ChildrenList.keys()))
         
@@ -110,5 +106,33 @@ class ThreadedProcessor( threading.Thread ):
                 dict[int(key)] = []
             dict[int(key)].append(int(value))
             
+
+class ThreadedProcessorReposData( threading.Thread ):
+        
+    def __init__(self, lib, linepool):
+        self.lib = lib
+        self.linepool = linepool
+        threading.Thread.__init__ ( self )
+    
+    def run(self):
+        i = 0
+        while (not self.linepool.empty()) and (i < 500000):       
+            line = self.linepool.get()
+            line = line.strip()
+            lineparts = line.split(',')
+            repos = lineparts[0].split(':')
+            reposnumber = int(repos[0])
+            repodata = repos[1].split('/')
+            if len(lineparts) > 2:
+                forkedfrom = int(lineparts[2])
+                if forkedfrom not in self.lib.ChildrenList.keys():
+                    self.lib.ChildrenList[forkedfrom] = []
+                self.lib.ChildrenList[forkedfrom].append(reposnumber)  
+            self.lib.ReposData[reposnumber] = {} 
+            self.lib.ReposData[reposnumber]["author"] = repodata[0]
+            self.lib.ReposData[reposnumber]["name"] = repodata[1]
+            i = i + 1
+                
+        print "THREAD PROCESSED LINES: " + str(i)
     
         
